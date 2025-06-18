@@ -1,1 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iris Species Classifier</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for background and font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: url('https://media.istockphoto.com/id/1157759107/photo/purple-iris-flowers.jpg?s=612x612&w=0&k=20&c=WMZY6jAX9Y54YfXMiMBJNUSdpSQNhNw4xjRlL5Q-US8='); /* HD Iris Photo */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
 
+        /* For a more blurred effect, apply it to the container instead of the body directly */
+        .glass-container {
+            background-color: rgba(255, 255, 255, 0.2); /* Semi-transparent white */
+            backdrop-filter: blur(10px); /* Blur effect */
+            -webkit-backdrop-filter: blur(10px); /* Safari support */
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="selection:bg-purple-300 selection:text-purple-900">
+
+    <div class="glass-container p-8 md:p-10 lg:p-12 rounded-2xl shadow-xl max-w-lg w-full transform transition-all duration-300 hover:scale-105">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-white text-center mb-6 drop-shadow-lg">
+            Iris Species Classifier
+        </h1>
+
+        <!-- Form for submitting data to Flask -->
+        <form id="irisForm" action="/predict" method="post" onsubmit="return validateForm()">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Sepal Length -->
+                <div>
+                    <label for="sepal_length" class="block text-white text-lg font-semibold mb-2 drop-shadow">Sepal Length (cm):</label>
+                    <input type="number" id="sepal_length" name="sepal_length" step="0.1" class="w-full p-3 rounded-xl bg-white bg-opacity-70 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-400 focus:bg-opacity-90 transition duration-200" placeholder="e.g., 5.1" required>
+                </div>
+
+                <!-- Sepal Width -->
+                <div>
+                    <label for="sepal_width" class="block text-white text-lg font-semibold mb-2 drop-shadow">Sepal Width (cm):</label>
+                    <input type="number" id="sepal_width" name="sepal_width" step="0.1" class="w-full p-3 rounded-xl bg-white bg-opacity-70 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-400 focus:bg-opacity-90 transition duration-200" placeholder="e.g., 3.5" required>
+                </div>
+
+                <!-- Petal Length -->
+                <div>
+                    <label for="petal_length" class="block text-white text-lg font-semibold mb-2 drop-shadow">Petal Length (cm):</label>
+                    <input type="number" id="petal_length" name="petal_length" step="0.1" class="w-full p-3 rounded-xl bg-white bg-opacity-70 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-400 focus:bg-opacity-90 transition duration-200" placeholder="e.g., 1.4" required>
+                </div>
+
+                <!-- Petal Width -->
+                <div>
+                    <label for="petal_width" class="block text-white text-lg font-semibold mb-2 drop-shadow">Petal Width (cm):</label>
+                    <input type="number" id="petal_width" name="petal_width" step="0.1" class="w-full p-3 rounded-xl bg-white bg-opacity-70 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-400 focus:bg-opacity-90 transition duration-200" placeholder="e.g., 0.2" required>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full py-3 px-6 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xl font-bold uppercase tracking-wide shadow-lg hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-4 focus:ring-purple-400 focus:ring-opacity-75 transform transition-all duration-300 hover:scale-105 active:scale-95">
+                Classify Iris
+            </button>
+        </form>
+
+        <!-- Result Box - populated by Flask's Jinja2 template engine -->
+        <div id="resultBox" class="mt-8 p-6 bg-white bg-opacity-70 rounded-2xl text-center text-gray-900 text-2xl font-bold shadow-inner
+            {% if prediction is not none %}
+                block
+            {% else %}
+                hidden
+            {% endif %}
+            transform transition-all duration-300">
+            <span id="speciesResult">
+                {% if prediction is not none %}
+                    Predicted Species: {{ prediction }}
+                {% endif %}
+            </span>
+        </div>
+
+        <!-- Message Box for client-side validation alerts -->
+        <div id="messageBox" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl p-6 shadow-2xl text-center max-w-sm w-full">
+                <p id="messageText" class="text-lg font-semibold text-gray-800 mb-4"></p>
+                <button id="closeMessageBtn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-semibold hover:bg-purple-700 transition duration-200">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references for client-side validation and message box
+        const sepalLengthInput = document.getElementById('sepal_length');
+        const sepalWidthInput = document.getElementById('sepal_width');
+        const petalLengthInput = document.getElementById('petal_length');
+        const petalWidthInput = document.getElementById('petal_width');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const closeMessageBtn = document.getElementById('closeMessageBtn');
+
+        /**
+         * Displays a custom message box.
+         * @param {string} message - The message to display.
+         */
+        function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+
+        /**
+         * Hides the custom message box.
+         */
+        function hideMessageBox() {
+            messageBox.classList.add('hidden');
+        }
+
+        // Event listener for the close button on the message box
+        closeMessageBtn.addEventListener('click', hideMessageBox);
+
+        /**
+         * Client-side form validation before submission.
+         * @returns {boolean} True if form is valid, false otherwise.
+         */
+        function validateForm() {
+            const sepalLength = parseFloat(sepalLengthInput.value);
+            const sepalWidth = parseFloat(sepalWidthInput.value);
+            const petalLength = parseFloat(petalLengthInput.value);
+            const petalWidth = parseFloat(petalWidthInput.value);
+
+            if (isNaN(sepalLength) || isNaN(sepalWidth) || isNaN(petalLength) || isNaN(petalWidth)) {
+                showMessageBox("Please enter valid numeric values for all parameters.");
+                return false; // Prevent form submission
+            }
+
+            if (sepalLength <= 0 || sepalWidth <= 0 || petalLength <= 0 || petalWidth <= 0) {
+                showMessageBox("Measurements must be positive values.");
+                return false; // Prevent form submission
+            }
+
+            return true; // Allow form submission
+        }
+    </script>
+</body>
+</html>
