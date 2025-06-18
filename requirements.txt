@@ -1,1 +1,6 @@
-
+Flask
+flask-wtf
+pandas
+numpy
+scikit-learn
+gunicorn
